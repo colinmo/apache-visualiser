@@ -1,0 +1,7 @@
+fulltest/*
+test/*
+GeoLite2-Country_20210413/*
+GeoLite2-Country*
+data_file.json
+fyne.syso
+foo.db
