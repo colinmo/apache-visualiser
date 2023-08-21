@@ -11,7 +11,6 @@ import (
 	"image/png"
 	"log"
 	"math"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -409,8 +408,7 @@ func worldGraphPng(year int, month int) *canvas.Image {
 		orderOfKeys = append(orderOfKeys, aRow.CountryCode)
 	}
 	var jsonFile = make(map[string][][]int)
-	data, _ := os.ReadFile("./country_points.json")
-	err = json.Unmarshal(data, &jsonFile)
+	err = json.Unmarshal(countryPoints, &jsonFile)
 	if err != nil {
 		panic(err)
 	}
