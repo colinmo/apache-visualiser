@@ -63,7 +63,6 @@ func LinkLogfile(filename string) error {
 	apacheDigest.LinkedLogFileOpen, err = os.Open(filename)
 	lineNumber = 0
 	if err != nil {
-		log.Fatal(fmt.Sprintf("Bad file name [%s]", filename))
 		return err
 	}
 	apacheDigest.LinkedLogFileScanner = bufio.NewScanner(apacheDigest.LinkedLogFileOpen)
