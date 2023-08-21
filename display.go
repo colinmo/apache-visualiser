@@ -2,14 +2,17 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
-	"io/ioutil"
+	"image/png"
 	"log"
 	"math"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,7 +26,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/anthonynsimon/bild/clone"
-	"github.com/anthonynsimon/bild/imgio"
 	chart "github.com/wcharczuk/go-chart/v2"
 	"github.com/wcharczuk/go-chart/v2/drawing"
 )
@@ -55,7 +57,7 @@ func lineGraphSummaryCategories(xValues []map[string]SummaryBlock, keys []string
 	baseColors["theme"] = drawing.Color{R: 255, G: 0, B: 255, A: 255}
 	baseColors["code"] = drawing.Color{R: 0, G: 255, B: 255, A: 255}
 
-	for category, _ := range baseColors { // Each category
+	for category := range baseColors { // Each category
 		myColor := baseColors[category]
 		for _, fieldName := range keys { // Each key
 			disColor := myColor
@@ -100,7 +102,6 @@ func lineGraphSummaryCategories(xValues []map[string]SummaryBlock, keys []string
 				YValues: ySeriesUnique,
 				Style:   chart.Style{StrokeColor: disColor, StrokeWidth: disWidth, StrokeDashArray: disDash},
 			})
-			fmt.Printf("%s", disWidth)
 		}
 	}
 
@@ -408,12 +409,13 @@ func worldGraphPng(year int, month int) *canvas.Image {
 		orderOfKeys = append(orderOfKeys, aRow.CountryCode)
 	}
 	var jsonFile = make(map[string][][]int)
-	data, _ := ioutil.ReadFile("./country_points.json")
+	data, _ := os.ReadFile("./country_points.json")
 	err = json.Unmarshal(data, &jsonFile)
 	if err != nil {
 		panic(err)
 	}
-	baseMap, err := imgio.Open("Simple_world_map3.png")
+
+	baseMap, err := png.Decode(base64.NewDecoder(base64.StdEncoding, strings.NewReader(imageWorldMap)))
 	if err != nil {
 		panic(err)
 	}
