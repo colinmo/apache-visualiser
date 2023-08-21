@@ -1,0 +1,74 @@
+erDiagram
+    MONTH_SUMMARIES {
+        string year
+        string month
+        int total_visits
+        int unique_visits
+        int total_pages
+        int total_hits
+        int bandwidth
+    }
+    DATE_SUMMARIES {
+        string year
+        string month
+        string date
+        int total_visits
+        int unique_visits
+        int total_pages
+        int total_hits
+        int bandwidth
+    }
+    DAY_SUMMARIES {
+        string year
+        string month
+        string day
+        int total_visits
+        int unique_visits
+        int total_pages
+        int total_hits
+        int bandwidth
+    }
+    HOUR_SUMMARIES {
+        string year
+        string month
+        string date
+        string hour
+        int total_visits
+        int unique_visits
+        int total_pages
+        int total_hits
+        int bandwidth
+    }
+    COUNTRY_SUMMARIES {
+        string country
+        int total_visits
+        int unique_visits
+        int total_pages
+        int total_hits
+        int bandwidth
+    }
+    INDIVIDUAL_ENTRIES {
+        string sourceidentifier
+        string ipaddress
+        string identd
+        string user
+        datetime requestdateandtime
+        string requestmethod
+        string requestresource
+        string requestprotocol
+        int statuscode
+        string bytessent
+        string referrer
+        string useragent
+        string country
+        string filetype
+        string operating_system
+        string browser
+    }
+    MONTH_SUMMARIES |o--o{ INDIVIDUAL_ENTRIES : summarises
+    DAY_SUMMARIES |o--o{ INDIVIDUAL_ENTRIES : summarises
+    DATE_SUMMARIES |o--o{ INDIVIDUAL_ENTRIES : summarises
+    HOUR_SUMMARIES |o--o{ INDIVIDUAL_ENTRIES : summarises
+    COUNTRY_SUMMARIES |o--o{ INDIVIDUAL_ENTRIES : summarises
+
+%% docker run -it -v ./:/data minlag/mermaid-cli -i erd.mmd
