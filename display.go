@@ -336,7 +336,7 @@ func lineGraphSummary(xValues []SummaryBlock, keys []string, startWith float64) 
 			Range: &chart.ContinuousRange{Min: 0.0, Max: byteMaxValue},
 			ValueFormatter: func(v interface{}) string {
 				if vf, isFloat := v.(float64); isFloat {
-					return fmt.Sprintf("%0.1fG", math.Floor(vf*10/1024/1024)/10)
+					return fmt.Sprintf("%0.1fM", math.Floor(vf*10/1024)/10)
 				}
 				return ""
 			},

@@ -10,15 +10,10 @@ import (
 	"strings"
 	"time"
 
-	//_ "github.com/mattn/go-sqlite3"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/oschwald/geoip2-golang"
 	"github.com/pattfy/useragent"
 )
-
-/*
- * Receives an ApacheEntry and updates a database of summaries, lookups, translates etc.
- */
 
 /*
  ISSUES:
@@ -144,9 +139,7 @@ var geoDB *geoip2.Reader
 
 func ConnectToDB() {
 	batchSize = 2000
-	// file:test.s3db?_auth&_auth_user=admin&_auth_pass=admin&_auth_crypt=sha1
 	var err error
-	// dbOfLogs, err = sql.Open("sqlite3", "./foo.db")
 	dbOfLogs, err = sql.Open("mysql", "apache:apache@tcp(127.0.0.1:3306)/apache")
 	if err != nil {
 		log.Fatal(err)
@@ -282,6 +275,11 @@ var weekdayTotal map[string]map[int]map[int]map[int]map[string]*SummarySet // So
 var hourTotal map[string]map[int]map[int]map[int]map[string]*SummarySet    // SourceId, Year, Month, Hour, Category
 var ipTotal map[string]map[int]map[int]map[string]*IPEntry                 // SourceId, Year, Month, IP => Count
 
+var monthCodeTotal map[string]map[int]map[int]map[int]int64 // SourceId, Year, Month, ResponseCode
+//var dateCodeTotal map[string]map[int]map[int]map[int]map[int]int64    // SourceId, Year, Month, Date, Category, ResponseCode
+//var weekdayCodeTotal map[string]map[int]map[int]map[int]map[int]int64 // SourceId, Year, Month, Weekday, Category, ResponseCode
+//var hourCodeTotal map[string]map[int]map[int]map[int]map[int]int64    // SourceId, Year, Month, Hour, Category, ResponseCode
+
 var hitTotal map[string]map[int]map[int]map[string]SummarySet       // SourceId, Year, Month, Category, ?
 var pageTotal map[string]map[int]map[int]map[string]SummarySet      // SourceId, Year, Month, Category, Page
 var robotTotal map[string]map[int]map[int]map[string]SummarySet     // SourceId, Year, Month, Category, RobotName
@@ -290,7 +288,6 @@ var extensionTotal map[string]map[int]map[int]map[string]SummarySet // SourceId,
 var osTotal map[string]map[int]map[int]map[string]SummarySet        // SourceId, Year, Month, Category, OS
 var browserTotal map[string]map[int]map[int]map[string]SummarySet   // SourceId, Year, Month, Category, BrowserName
 var referrerTotal map[string]map[int]map[int]map[string]SummarySet  // SourceId, Year, Month, Category, Referrer
-var codeTotal map[string]map[int]map[int]map[string]SummarySet      // SourceId, Year, Month, Category, ResponseCode
 var fourohfourList map[string]map[int]map[int]map[string]int        // SourceId, Year, Month, Category, Page (404 code specifically)
 var actionList map[string]map[int]map[int]map[string]int            // SourceId, Year, Month, Category, Action String
 
@@ -327,11 +324,44 @@ func SaveEntry(dbEntry StorageEntry) {
 		weekdayTotal[dbEntry.SourceId] = make(map[int]map[int]map[int]map[string]*SummarySet)
 		hourTotal[dbEntry.SourceId] = make(map[int]map[int]map[int]map[string]*SummarySet)
 	}
+	if monthCodeTotal[dbEntry.SourceId] == nil {
+		monthCodeTotal = make(map[string]map[int]map[int]map[int]int64)
+		//		dateCodeTotal = make(map[string]map[int]map[int]map[int]map[int]int64)
+		//		weekdayCodeTotal = make(map[string]map[int]map[int]map[int]map[int]int64)
+		//		hourCodeTotal = make(map[string]map[int]map[int]map[int]map[int]int64)
+		monthCodeTotal[dbEntry.SourceId] = make(map[int]map[int]map[int]int64)
+		//		dateCodeTotal[dbEntry.SourceId] = make(map[int]map[int]map[int]map[int]int64)
+		//		weekdayCodeTotal[dbEntry.SourceId] = make(map[int]map[int]map[int]map[int]int64)
+		//		hourCodeTotal[dbEntry.SourceId] = make(map[int]map[int]map[int]map[int]int64)
+
+	}
 	if monthTotal[dbEntry.SourceId][yearBit] == nil {
 		monthTotal[dbEntry.SourceId][yearBit] = make(map[int]map[string]*SummarySet)
 		dateTotal[dbEntry.SourceId][yearBit] = make(map[int]map[int]map[string]*SummarySet)
 		weekdayTotal[dbEntry.SourceId][yearBit] = make(map[int]map[int]map[string]*SummarySet)
 		hourTotal[dbEntry.SourceId][yearBit] = make(map[int]map[int]map[string]*SummarySet)
+
+		monthCodeTotal[dbEntry.SourceId][yearBit] = make(map[int]map[int]int64)
+		//		dateCodeTotal[dbEntry.SourceId][yearBit] = make(map[int]map[int]map[int]int64)
+		//		weekdayCodeTotal[dbEntry.SourceId][yearBit] = make(map[int]map[int]map[int]int64)
+		//		hourCodeTotal[dbEntry.SourceId][yearBit] = make(map[int]map[int]map[int]int64)
+		blank := make(map[int]int64)
+		for mn := 1; mn < 13; mn++ {
+			monthCodeTotal[dbEntry.SourceId][yearBit][mn] = blank
+			//			dateCodeTotal[dbEntry.SourceId][yearBit][mn] = make(map[int]map[int]int64)
+			//			weekdayCodeTotal[dbEntry.SourceId][yearBit][mn] = make(map[int]map[int]int64)
+			//			hourCodeTotal[dbEntry.SourceId][yearBit][mn] = make(map[int]map[int]int64)
+			//			end := time.Date(yearBit, time.Month(mn+1), 0, 0, 0, 0, 0, time.Local).Day() + 1
+			//			for d := 1; d < end; d++ {
+			//				dateCodeTotal[dbEntry.SourceId][yearBit][mn][d] = blank
+			//			}
+			//			for d := 0; d < 7; d++ {
+			//				weekdayCodeTotal[dbEntry.SourceId][yearBit][mn][d] = blank
+			//			}
+			//			for d := 0; d < 24; d++ {
+			//				hourCodeTotal[dbEntry.SourceId][yearBit][mn][d] = blank
+			//			}
+		}
 	}
 	if monthTotal[dbEntry.SourceId][yearBit][monthBit] == nil {
 		monthTotal[dbEntry.SourceId][yearBit][monthBit] = make(map[string]*SummarySet)
@@ -570,6 +600,27 @@ func SaveEntry(dbEntry StorageEntry) {
 		NonBotPages:    hourNonBotPages,
 		NonBotHits:     hourNonBotHits,
 	}
+	if _, gg := monthCodeTotal[dbEntry.SourceId][yearBit][monthBit][dbEntry.StatusCode]; !gg {
+		monthCodeTotal[dbEntry.SourceId][yearBit][monthBit][dbEntry.StatusCode] = 0
+	}
+	monthCodeTotal[dbEntry.SourceId][yearBit][monthBit][dbEntry.StatusCode]++
+	//	if _, gg := dateCodeTotal[dbEntry.SourceId][yearBit][monthBit][dateBit][dbEntry.StatusCode]; !gg {
+	//		dateCodeTotal[dbEntry.SourceId][yearBit][monthBit][dateBit][dbEntry.StatusCode] = 0
+	//	}
+	//
+	// dateCodeTotal[dbEntry.SourceId][yearBit][monthBit][dateBit][dbEntry.StatusCode]++
+	//
+	//	if _, gg := hourCodeTotal[dbEntry.SourceId][yearBit][monthBit][hourBit][dbEntry.StatusCode]; !gg {
+	//		hourCodeTotal[dbEntry.SourceId][yearBit][monthBit][hourBit][dbEntry.StatusCode] = 0
+	//	}
+	//
+	// hourCodeTotal[dbEntry.SourceId][yearBit][monthBit][hourBit][dbEntry.StatusCode]++
+	//
+	//	if _, gg := weekdayCodeTotal[dbEntry.SourceId][yearBit][monthBit][weekBit][dbEntry.StatusCode]; !gg {
+	//		weekdayCodeTotal[dbEntry.SourceId][yearBit][monthBit][weekBit][dbEntry.StatusCode] = 0
+	//	}
+	//
+	// weekdayCodeTotal[dbEntry.SourceId][yearBit][monthBit][weekBit][dbEntry.StatusCode]++
 }
 
 func SaveToDb() {
@@ -622,7 +673,7 @@ func SaveToDb() {
 					kbytes, pages, hit, notbotpage, notbothit) values 
 					(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 						sourceid, monthbit, yearbit, category, summary.UniqueVisitors, summary.Visits,
-						summary.KBytes, summary.Pages, summary.Hit, summary.NonBotPages, summary.NonBotHits,
+						summary.KBytes/1024, summary.Pages, summary.Hit, summary.NonBotPages, summary.NonBotHits,
 					)
 					if err != nil {
 						fmt.Printf("Failed\n")
@@ -635,7 +686,7 @@ func SaveToDb() {
 					for hour, summary := range hourTotal[sourceid][yearbit][monthbit] {
 						valueStrings = append(valueStrings, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 						valueArgs = append(valueArgs, sourceid, yearbit, monthbit, hour, category,
-							summary[category].UniqueVisitors, summary[category].Visits, summary[category].KBytes,
+							summary[category].UniqueVisitors, summary[category].Visits, summary[category].KBytes/1024,
 							summary[category].Pages, summary[category].Hit, summary[category].NonBotPages, summary[category].NonBotHits)
 					}
 					stmt = fmt.Sprintf(
@@ -654,7 +705,7 @@ func SaveToDb() {
 					for weekday, summary := range weekdayTotal[sourceid][yearbit][monthbit] {
 						valueStrings = append(valueStrings, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 						valueArgs = append(valueArgs, sourceid, yearbit, monthbit, weekday, category,
-							summary[category].UniqueVisitors, summary[category].Visits, summary[category].KBytes,
+							summary[category].UniqueVisitors, summary[category].Visits, summary[category].KBytes/1024,
 							summary[category].Pages, summary[category].Hit, summary[category].NonBotPages,
 							summary[category].NonBotHits)
 					}
@@ -672,7 +723,7 @@ func SaveToDb() {
 					for date, summary := range dateTotal[sourceid][yearbit][monthbit] {
 						valueStrings = append(valueStrings, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 						valueArgs = append(valueArgs, sourceid, yearbit, monthbit, date, category,
-							summary[category].UniqueVisitors, summary[category].Visits, summary[category].KBytes,
+							summary[category].UniqueVisitors, summary[category].Visits, summary[category].KBytes/1024,
 							summary[category].Pages, summary[category].Hit, summary[category].NonBotPages,
 							summary[category].NonBotHits)
 					}
@@ -685,6 +736,62 @@ func SaveToDb() {
 						log.Fatal(err)
 					}
 				}
+
+				// STATUS CODES
+				for code, value := range monthCodeTotal[sourceid][yearbit][monthbit] {
+					_, err := dbOfLogs.Exec(`
+				INSERT INTO month_status_total
+				(sourceid, month, year, status, hits) values 
+				(?, ?, ?, ?, ?)`,
+						sourceid, monthbit, yearbit, code, value,
+					)
+					if err != nil {
+						fmt.Printf("Failed\n")
+						log.Fatal(err)
+					}
+				}
+				//				for d, thing := range dateCodeTotal[sourceid][yearbit][monthbit] {
+				//					for code, value := range thing {
+				//						_, err := dbOfLogs.Exec(`
+				//				INSERT INTO date_status_total
+				//				(sourceid, month, year, date, status, hits) values
+				//				(?, ?, ?, ?, ?, ?)`,
+				//							sourceid, monthbit, yearbit, d, code, value,
+				//						)
+				//						if err != nil {
+				//							fmt.Printf("Failed\n")
+				//							log.Fatal(err)
+				//						}
+				//					}
+				//				}
+				//				for d, thing := range dateCodeTotal[sourceid][yearbit][monthbit] {
+				//					for code, value := range thing {
+				//						_, err := dbOfLogs.Exec(`
+				//				INSERT INTO hour_status_total
+				//				(sourceid, month, year, hour, status, hits) values
+				//				(?, ?, ?, ?, ?, ?)`,
+				//							sourceid, monthbit, yearbit, d, code, value,
+				//						)
+				//						if err != nil {
+				//							fmt.Printf("Failed\n")
+				//							log.Fatal(err)
+				//						}
+				//					}
+				//				}
+				//				for d, thing := range dateCodeTotal[sourceid][yearbit][monthbit] {
+				//					for code, value := range thing {
+				//						_, err := dbOfLogs.Exec(`
+				//				INSERT INTO weekday_status_total
+				//				(sourceid, month, year, weekday, status, hits) values
+				//				(?, ?, ?, ?, ?, ?)`,
+				//							sourceid, monthbit, yearbit, d, code, value,
+				//						)
+				//						if err != nil {
+				//							fmt.Printf("Failed\n")
+				//							log.Fatal(err)
+				//						}
+				//					}
+				//				}
 			}
 		}
 	}
@@ -853,7 +960,42 @@ func CreateBaseTables() {
 		countrycode  varchar(3),
 		primary key (sourceid, year, month, ip)
 	);
-	
+	-- Summaries
+	CREATE OR REPLACE TABLE month_status_total (
+		sourceid varchar(200),
+		month int,
+		year int,
+		status int,
+		hits int,
+		primary key (month, year, status, sourceid)
+	);
+--	CREATE OR REPLACE TABLE hour_status_total (
+--		sourceid varchar(200),
+--		year int,
+--		month int,
+--		hour int, 
+--		status int,
+--		hits int,
+--		primary key (sourceid, year, month, hour, status)
+--	);
+--	CREATE OR REPLACE TABLE date_status_total (
+--		sourceid varchar(200),
+--		year int,
+--		month int,
+--		date int, 
+--		status int,
+--		hits int,
+--		primary key (sourceid, year, month, date, status)
+--	);
+--	CREATE OR REPLACE TABLE weekday_status_total (
+--		sourceid varchar(200),
+--		year int,
+--		month int,
+--		weekday int, 
+--		status int,
+--		hits int,
+--		primary key (sourceid, year, month, weekday, status)
+--	);	
 	DROP PROCEDURE if exists apache_entry_ip_lookup;
 	DELIMITER $$
 	CREATE PROCEDURE apache_entry_ip_lookup()
