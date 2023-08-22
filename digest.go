@@ -76,7 +76,7 @@ func NextLine() (ApacheEntry, error) {
 	if ok {
 		entryString := apacheDigest.LinkedLogFileScanner.Text()
 		// 141.226.212.148 - - [31/Jan/2021:23:17:10 +1100] "GET /robots.txt HTTP/1.1" 200 - "-" "omgili/0.5 +http://omgili.com"
-		matchExpression := regexp.MustCompile(`^(?P<IPAddress>\S+) (?P<Identd>\S+) (?P<User>\S+) \[(?P<RequestDateAndTime>[\w:/]+\s[+\-]\d{4})\] "(?P<MethodResourceProtocol>([^"]|\\")*)" (?P<StatusCode>\d{3}) (?P<BytesSent>\S+) "(?P<Referrer>([^"]|\\")*)" "(?P<UserAgent>([^"]|\\")*)"`)
+		matchExpression := regexp.MustCompile(`^(?P<IPAddress>\S+) (?P<Identd>\S+) (?P<User>\S+) \[(?P<RequestDateAndTime>[\w:/]+\s[+\-]\d{4})\] "(?P<MethodResourceProtocol>([^"]|\\")*)" (?P<StatusCode>\d{3}) (?P<BytesSent>\S+) "(?P<Referrer>([^"]|\\")*)" "(?P<UserAgent>(.*))"$`)
 		results := matchExpression.FindStringSubmatch(entryString)
 
 		matchExpression2 := regexp.MustCompile(`^(?P<RequestMethod>\S+) (?P<RequestResource>.+?)\s(?P<RequestProtocol>\S+)$`)

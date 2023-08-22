@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/url"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -140,7 +143,7 @@ var geoDB *geoip2.Reader
 func ConnectToDB() {
 	batchSize = 2000
 	var err error
-	dbOfLogs, err = sql.Open("mysql", "apache:apache@tcp(127.0.0.1:3306)/apache")
+	dbOfLogs, err = sql.Open("mysql", "apache:apache@tcp(127.0.0.1:3306)/apache?allowAllFiles=true")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -191,15 +194,28 @@ func ClearExistingForSource(source string) error {
 	return err
 }
 
+var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9.]+`)
+
+func clearString(str string) string {
+	return nonAlphanumericRegex.ReplaceAllString(str, "")
+}
+
 func ProcessEntry(entry ApacheEntry) {
 	// Process user agent field
 	userAgent := useragent.New(entry.UserAgent)
 	// Process file type by Extension
-	filetype := filepath.Ext(entry.RequestResource)
-	mep := strings.Split(filetype, "?")
-	if len(mep) > 1 {
-		filetype = mep[0]
+	url, err := url.Parse("https://bob.com" + entry.RequestResource)
+	filetype := ""
+	if err == nil {
+		filetype = filepath.Ext(url.Path)
+	} else {
+		filetype = filepath.Ext(entry.RequestResource)
+		mep := strings.Split(filetype, "?")
+		if len(mep) > 1 {
+			filetype = mep[0]
+		}
 	}
+	filetype = clearString(filetype)
 	if len(filetype) > 20 {
 		filetype = filetype[0:20]
 	}
@@ -256,6 +272,10 @@ func ProcessEntry(entry ApacheEntry) {
 		IsSearchengine:     userAgent.Bot.IsSearchEngine(),
 		IsMobile:           userAgent.Device.IsMobile(),
 		IsTablet:           userAgent.Device.IsTablet(),
+	}
+	if category == "0" {
+		fmt.Printf("Error: %s:%d\n", entry.SourceId, entry.LineNumber)
+		log.Fatal("f")
 	}
 	SaveEntry(storageEntry)
 }
@@ -581,140 +601,144 @@ func SaveEntry(dbEntry StorageEntry) {
 }
 
 func SaveToDb() {
-	// Monthly Summaries
-	var stmt string
-	for sourceid, group1 := range monthTotal {
-		for yearbit, group2 := range group1 {
-			for monthbit, group3 := range group2 {
-				// IP Address
-				valueStrings := make([]string, 0, len(unsavedRows))
-				valueArgs := make([]interface{}, 0, len(ipTotal[sourceid][yearbit][monthbit])*2)
-				ipCounter := 0
-				for ip, count := range ipTotal[sourceid][yearbit][monthbit] {
-					valueStrings = append(valueStrings, "(?, ?, ?, ?, ?, ?)")
-					valueArgs = append(valueArgs, sourceid, yearbit, monthbit, ip, count.EntryCount, count.CountryCode)
-					ipCounter++
-					if ipCounter%1000 == 0 {
-						stmt = fmt.Sprintf(
-							`INSERT INTO ip_total
-						(sourceid, year, month, ip, hits, countrycode)
-						VALUES %s`,
-							strings.Join(valueStrings, ","))
-						_, err := dbOfLogs.Exec(stmt, valueArgs...)
-						if err != nil {
-							fmt.Printf("Failed\n")
-							log.Fatal(err)
-						}
-						valueStrings = make([]string, 0, len(unsavedRows))
-						valueArgs = make([]interface{}, 0, len(ipTotal[sourceid][yearbit][monthbit])*2)
-					}
-				}
-				if len(valueArgs) > 0 {
-					stmt = fmt.Sprintf(
-						`INSERT INTO ip_total
-				(sourceid, year, month, ip, hits, countrycode)
-				VALUES %s`,
-						strings.Join(valueStrings, ","))
-					_, err := dbOfLogs.Exec(stmt, valueArgs...)
-					if err != nil {
-						fmt.Printf("Failed\n")
-						log.Fatal(err)
-					}
-				}
-
-				for category, summary := range group3 {
-					// Month Totals
-					_, err := dbOfLogs.Exec(`
-					INSERT INTO month_total
-					(sourceid, month, year, category, uniquevisitors, visits,
-					kbytes, pages, hit, notbotpage, notbothit) values 
-					(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-						sourceid, monthbit, yearbit, category, summary.UniqueVisitors, summary.Visits,
-						summary.KBytes/1024, summary.Pages, summary.Hit, summary.NonBotPages, summary.NonBotHits,
-					)
-					if err != nil {
-						fmt.Printf("Failed\n")
-						log.Fatal(err)
-					}
-
-					// HOUR TOTALS
-					valueStrings = make([]string, 0, len(hourTotal))
-					valueArgs = make([]interface{}, 0, len(hourTotal)*2)
-					for hour, summary := range hourTotal[sourceid][yearbit][monthbit] {
-						valueStrings = append(valueStrings, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-						valueArgs = append(valueArgs, sourceid, yearbit, monthbit, hour, category,
-							summary[category].UniqueVisitors, summary[category].Visits, summary[category].KBytes/1024,
-							summary[category].Pages, summary[category].Hit, summary[category].NonBotPages, summary[category].NonBotHits)
-					}
-					stmt = fmt.Sprintf(
-						`INSERT INTO hour_total ( sourceid, year, month, hour, category,
-							uniquevisitors, visits, kbytes, pages, hit, notbotpage,
-							notbothit) values %s`,
-						strings.Join(valueStrings, ","))
-					_, err = dbOfLogs.Exec(stmt, valueArgs...)
-					if err != nil {
-						fmt.Printf("Failed\n")
-						log.Fatal(err)
-					}
-					// WEEKDAY TOTALS
-					valueStrings = make([]string, 0, len(weekdayTotal))
-					valueArgs = make([]interface{}, 0, len(weekdayTotal)*2)
-					for weekday, summary := range weekdayTotal[sourceid][yearbit][monthbit] {
-						valueStrings = append(valueStrings, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-						valueArgs = append(valueArgs, sourceid, yearbit, monthbit, weekday, category,
-							summary[category].UniqueVisitors, summary[category].Visits, summary[category].KBytes/1024,
-							summary[category].Pages, summary[category].Hit, summary[category].NonBotPages,
-							summary[category].NonBotHits)
-					}
-					stmt = fmt.Sprintf(
-						`INSERT INTO weekday_total ( sourceid, year, month, weekday, category, uniquevisitors, visits, kbytes, pages, hit, notbotpage, notbothit) values %s`,
-						strings.Join(valueStrings, ","))
-					_, err = dbOfLogs.Exec(stmt, valueArgs...)
-					if err != nil {
-						fmt.Printf("Failed\n")
-						log.Fatal(err)
-					}
-					// DATE TOTALS
-					valueStrings = make([]string, 0, len(dateTotal))
-					valueArgs = make([]interface{}, 0, len(dateTotal)*2)
-					for date, summary := range dateTotal[sourceid][yearbit][monthbit] {
-						valueStrings = append(valueStrings, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-						valueArgs = append(valueArgs, sourceid, yearbit, monthbit, date, category,
-							summary[category].UniqueVisitors, summary[category].Visits, summary[category].KBytes/1024,
-							summary[category].Pages, summary[category].Hit, summary[category].NonBotPages,
-							summary[category].NonBotHits)
-					}
-					stmt = fmt.Sprintf(
-						`INSERT INTO date_total ( sourceid, year, month, date, category, uniquevisitors, visits, kbytes, pages, hit, notbotpage, notbothit) values %s`,
-						strings.Join(valueStrings, ","))
-					_, err = dbOfLogs.Exec(stmt, valueArgs...)
-					if err != nil {
-						fmt.Printf("Failed\n")
-						log.Fatal(err)
-					}
-				}
-
-				// STATUS CODES
-				for code, value := range monthCodeTotal[sourceid][yearbit][monthbit] {
-					_, err := dbOfLogs.Exec(`
-				INSERT INTO month_status_total
-				(sourceid, month, year, status, hits) values 
-				(?, ?, ?, ?, ?)`,
-						sourceid, monthbit, yearbit, code, value,
-					)
-					if err != nil {
-						fmt.Printf("Failed\n")
-						log.Fatal(err)
-					}
-				}
-			}
-		}
+	if len(unsavedRows) == 0 {
+		return
 	}
+	sourceId := unsavedRows[0].SourceId
+	// Raw data
+	file, err := os.CreateTemp(os.TempDir(), "x")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer os.Remove(file.Name())
+
+	tf := map[bool]int{
+		true:  1,
+		false: 0,
+	}
+	for _, valueStrings := range unsavedRows {
+		file.WriteString(
+			fmt.Sprintf(
+				"xxx%s~~%d~~%s~~%s~~%s~~%s~~%s~~%s~~%s~~%d~~%s~~%s~~%s~~%s~~%s~~%s~~%s~~%s~~%d~~%d~~%d~~%d~~%s\n",
+				valueStrings.SourceId,
+				valueStrings.LineNumber,
+				valueStrings.IPAddress,
+				valueStrings.Identd,
+				valueStrings.User,
+				valueStrings.RequestDateAndTime.Local().Format("2006-01-02T15:04:05"),
+				valueStrings.RequestMethod,
+				valueStrings.RequestResource,
+				valueStrings.RequestProtocol,
+				valueStrings.StatusCode,
+				valueStrings.BytesSent,
+				valueStrings.Referrer,
+				valueStrings.UserAgent,
+				valueStrings.Country,
+				valueStrings.CountryCode,
+				valueStrings.Filetype,
+				valueStrings.OperatingSystem,
+				valueStrings.Browser,
+				tf[valueStrings.IsBot],
+				tf[valueStrings.IsSearchengine],
+				tf[valueStrings.IsMobile],
+				tf[valueStrings.IsTablet],
+				valueStrings.Category))
+	}
+
+	dbOfLogs.Exec(`DELETE FROM apache_entry WHERE sourceid = ?`, sourceId)
+	x, y := dbOfLogs.Exec(fmt.Sprintf(`LOAD DATA LOCAL INFILE '%s' INTO TABLE apache_entry FIELDS TERMINATED BY '~~'  LINES STARTING BY 'xxx';`, strings.ReplaceAll(file.Name(), `\`, `\\`)))
+	if y != nil {
+		fmt.Printf("%v\n", x)
+		log.Fatal(y)
+	}
+	dbOfLogs.Exec(`DELETE FROM ip_total WHERE sourceid = ?`, sourceId)
+	r, e := dbOfLogs.Exec(`INSERT INTO ip_total (sourceid, year, month, ip, visits, hits, pages, countrycode, kbytes, notbothit, notbotpage,uniquevisitors)
+		SELECT sourceid,
+			year(requestdateandtime),
+			month(requestdateandtime),
+			ipaddress,
+			count(*),
+			count(if(statuscode >= 200 and statuscode < 400, 1, null)),
+			count(if(filetype in ('.php','.html'), 1, null)),
+			countrycode,
+			sum(bytessent),
+			count(if(isbot=1,NULL,1)),
+			count(if(isbot!=1 and filetype in ('.php','.html'),NULL,1)),
+			0
+			FROM apache_entry WHERE sourceid = ? GROUP BY sourceid, year(requestdateandtime), month(requestdateandtime), ipaddress, countrycode`, sourceId)
+	if e != nil {
+		fmt.Printf("Error %v\n\n%v\n", r, e)
+		log.Fatal("Damn")
+	}
+	dbOfLogs.Exec(`DELETE FROM month_total WHERE sourceid = ?`, sourceId)
+	r, e = dbOfLogs.Exec(`INSERT INTO month_total (sourceid, year, month, category, visits, hit, pages, kbytes, notbothit, notbotpage, uniquevisitors)
+		SELECT sourceid,
+			year(requestdateandtime),
+			month(requestdateandtime),
+			category,
+			count(*),
+			count(if(statuscode >= 200 and statuscode < 400, 1, null)),
+			count(if(filetype in ('.php','.html'), 1, null)),
+			sum(bytessent),
+			count(if(isbot=1,NULL,1)),
+			count(if(isbot!=1 and filetype in ('.php','.html'),NULL,1)),
+			0
+			FROM apache_entry WHERE sourceid = ? GROUP BY sourceid, year(requestdateandtime), month(requestdateandtime), category`, sourceId)
+	if e != nil {
+		fmt.Printf("Error %v\n\n%v\n", r, e)
+		log.Fatal("Damn")
+	}
+	dbOfLogs.Exec(`DELETE FROM hour_total WHERE sourceid = ?`, sourceId)
+	r, e = dbOfLogs.Exec(`INSERT INTO hour_total (sourceid, year, month, hour, category, visits, hit, pages, kbytes, notbothit, notbotpage,uniquevisitors)
+		SELECT sourceid,
+			year(requestdateandtime),
+			month(requestdateandtime),
+			hour(requestdateandtime),
+			category,
+			count(*),
+			count(if(statuscode >= 200 and statuscode < 400, 1, null)),
+			count(if(filetype in ('.php','.html'), 1, null)),
+			sum(bytessent),
+			count(if(isbot=1,NULL,1)),
+			count(if(isbot!=1 and filetype in ('.php','.html'),NULL,1)),
+			0
+			FROM apache_entry WHERE sourceid = ? GROUP BY sourceid, year(requestdateandtime), month(requestdateandtime), hour(requestdateandtime), category`, sourceId)
+	if e != nil {
+		fmt.Printf("Error %v\n\n%v\n", r, e)
+		log.Fatal("Damn")
+	}
+	dbOfLogs.Exec(`DELETE FROM date_total WHERE sourceid = ?`, sourceId)
+	dbOfLogs.Exec(`INSERT INTO date_total (sourceid, year, month, date, category, visits, hit, pages, kbytes, notbothit, notbotpage, uniquevisitors)
+		SELECT sourceid,
+			year(requestdateandtime),
+			month(requestdateandtime),
+			day(requestdateandtime),
+			category,
+			count(*),
+			count(if(statuscode >= 200 and statuscode < 400, 1, null)),
+			count(if(filetype in ('.php','.html'), 1, null)),
+			sum(bytessent),
+			count(if(isbot=1,NULL,1)),
+			count(if(isbot!=1 and filetype in ('.php','.html'),NULL,1)),
+			0
+			FROM apache_entry WHERE sourceid = ? GROUP BY sourceid, year(requestdateandtime), month(requestdateandtime), day(requestdateandtime), category`, sourceId)
+	dbOfLogs.Exec(`DELETE FROM weekday_total WHERE sourceid = ?`, sourceId)
+	dbOfLogs.Exec(`INSERT INTO weekday_total (sourceid, year, month, weekday, category, visits, hit, pages, kbytes, notbothit, notbotpage, uniquevisitors)
+		SELECT sourceid,
+			year(requestdateandtime),
+			month(requestdateandtime),
+			weekday(requestdateandtime),
+			category,
+			count(*),
+			count(if(statuscode >= 200 and statuscode < 400, 1, null)),
+			count(if(filetype in ('.php','.html'), 1, null)),
+			sum(bytessent),
+			count(if(isbot=1,NULL,1)),
+			count(if(isbot!=1 and filetype in ('.php','.html'),NULL,1)),
+			0
+			FROM apache_entry WHERE sourceid = ? GROUP BY sourceid, year(requestdateandtime), month(requestdateandtime), weekday(requestdateandtime), category`, sourceId)
 	// Prepare for the next file
 	unsavedRows = make([]StorageEntry, 0, batchSize)
-	// monthSeenVisitors = make(map[int]map[int]map[int]string)
-	// monthTotal = make(map[string]map[int]map[int]SummarySet)
-	// ipTotal = make(map[int]map[int]map[string]int64)
 }
 
 // We've finished uploading this file, so update all the IP lookups

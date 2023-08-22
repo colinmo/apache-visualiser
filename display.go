@@ -120,7 +120,7 @@ func lineGraphSummaryCategories(xValues []map[string]SummaryBlock, keys []string
 			Range: &chart.ContinuousRange{Min: 0.0, Max: byteMaxValue},
 			ValueFormatter: func(v interface{}) string {
 				if vf, isFloat := v.(float64); isFloat {
-					return fmt.Sprintf("%0.1fG", math.Floor(vf*10/1024/1024)/10)
+					return fmt.Sprintf("%0.1fM", math.Floor(vf*10/1024)/10)
 				}
 				return ""
 			},
@@ -301,10 +301,12 @@ func lineGraphSummary(xValues []SummaryBlock, keys []string, startWith float64) 
 				appender = float64(xValues[mep].notbothit)
 				seriesTitle = "Not bot hits"
 			}
-			if fieldName != "kbytes" && appender > maxValue {
+			if fieldName == "kbytes" {
+				if appender > byteMaxValue {
+					byteMaxValue = appender
+				}
+			} else if appender > maxValue {
 				maxValue = appender
-			} else if fieldName == "kbytes" && appender > byteMaxValue {
-				byteMaxValue = appender
 			}
 			ySeriesUnique[mep] = appender
 		}
@@ -336,7 +338,7 @@ func lineGraphSummary(xValues []SummaryBlock, keys []string, startWith float64) 
 			Range: &chart.ContinuousRange{Min: 0.0, Max: byteMaxValue},
 			ValueFormatter: func(v interface{}) string {
 				if vf, isFloat := v.(float64); isFloat {
-					return fmt.Sprintf("%0.1fM", math.Floor(vf*10/1024)/10)
+					return fmt.Sprintf("%0.1fM", math.Floor(vf*10/1024/1024)/10)
 				}
 				return ""
 			},
