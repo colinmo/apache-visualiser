@@ -274,11 +274,7 @@ var dateTotal map[string]map[int]map[int]map[int]map[string]*SummarySet    // So
 var weekdayTotal map[string]map[int]map[int]map[int]map[string]*SummarySet // SourceId, Year, Month, Weekday, Category
 var hourTotal map[string]map[int]map[int]map[int]map[string]*SummarySet    // SourceId, Year, Month, Hour, Category
 var ipTotal map[string]map[int]map[int]map[string]*IPEntry                 // SourceId, Year, Month, IP => Count
-
-var monthCodeTotal map[string]map[int]map[int]map[int]int64 // SourceId, Year, Month, ResponseCode
-//var dateCodeTotal map[string]map[int]map[int]map[int]map[int]int64    // SourceId, Year, Month, Date, Category, ResponseCode
-//var weekdayCodeTotal map[string]map[int]map[int]map[int]map[int]int64 // SourceId, Year, Month, Weekday, Category, ResponseCode
-//var hourCodeTotal map[string]map[int]map[int]map[int]map[int]int64    // SourceId, Year, Month, Hour, Category, ResponseCode
+var monthCodeTotal map[string]map[int]map[int]map[int]int64                // SourceId, Year, Month, ResponseCode
 
 var hitTotal map[string]map[int]map[int]map[string]SummarySet       // SourceId, Year, Month, Category, ?
 var pageTotal map[string]map[int]map[int]map[string]SummarySet      // SourceId, Year, Month, Category, Page
@@ -326,13 +322,7 @@ func SaveEntry(dbEntry StorageEntry) {
 	}
 	if monthCodeTotal[dbEntry.SourceId] == nil {
 		monthCodeTotal = make(map[string]map[int]map[int]map[int]int64)
-		//		dateCodeTotal = make(map[string]map[int]map[int]map[int]map[int]int64)
-		//		weekdayCodeTotal = make(map[string]map[int]map[int]map[int]map[int]int64)
-		//		hourCodeTotal = make(map[string]map[int]map[int]map[int]map[int]int64)
 		monthCodeTotal[dbEntry.SourceId] = make(map[int]map[int]map[int]int64)
-		//		dateCodeTotal[dbEntry.SourceId] = make(map[int]map[int]map[int]map[int]int64)
-		//		weekdayCodeTotal[dbEntry.SourceId] = make(map[int]map[int]map[int]map[int]int64)
-		//		hourCodeTotal[dbEntry.SourceId] = make(map[int]map[int]map[int]map[int]int64)
 
 	}
 	if monthTotal[dbEntry.SourceId][yearBit] == nil {
@@ -342,25 +332,9 @@ func SaveEntry(dbEntry StorageEntry) {
 		hourTotal[dbEntry.SourceId][yearBit] = make(map[int]map[int]map[string]*SummarySet)
 
 		monthCodeTotal[dbEntry.SourceId][yearBit] = make(map[int]map[int]int64)
-		//		dateCodeTotal[dbEntry.SourceId][yearBit] = make(map[int]map[int]map[int]int64)
-		//		weekdayCodeTotal[dbEntry.SourceId][yearBit] = make(map[int]map[int]map[int]int64)
-		//		hourCodeTotal[dbEntry.SourceId][yearBit] = make(map[int]map[int]map[int]int64)
 		blank := make(map[int]int64)
 		for mn := 1; mn < 13; mn++ {
 			monthCodeTotal[dbEntry.SourceId][yearBit][mn] = blank
-			//			dateCodeTotal[dbEntry.SourceId][yearBit][mn] = make(map[int]map[int]int64)
-			//			weekdayCodeTotal[dbEntry.SourceId][yearBit][mn] = make(map[int]map[int]int64)
-			//			hourCodeTotal[dbEntry.SourceId][yearBit][mn] = make(map[int]map[int]int64)
-			//			end := time.Date(yearBit, time.Month(mn+1), 0, 0, 0, 0, 0, time.Local).Day() + 1
-			//			for d := 1; d < end; d++ {
-			//				dateCodeTotal[dbEntry.SourceId][yearBit][mn][d] = blank
-			//			}
-			//			for d := 0; d < 7; d++ {
-			//				weekdayCodeTotal[dbEntry.SourceId][yearBit][mn][d] = blank
-			//			}
-			//			for d := 0; d < 24; d++ {
-			//				hourCodeTotal[dbEntry.SourceId][yearBit][mn][d] = blank
-			//			}
 		}
 	}
 	if monthTotal[dbEntry.SourceId][yearBit][monthBit] == nil {
@@ -604,23 +578,6 @@ func SaveEntry(dbEntry StorageEntry) {
 		monthCodeTotal[dbEntry.SourceId][yearBit][monthBit][dbEntry.StatusCode] = 0
 	}
 	monthCodeTotal[dbEntry.SourceId][yearBit][monthBit][dbEntry.StatusCode]++
-	//	if _, gg := dateCodeTotal[dbEntry.SourceId][yearBit][monthBit][dateBit][dbEntry.StatusCode]; !gg {
-	//		dateCodeTotal[dbEntry.SourceId][yearBit][monthBit][dateBit][dbEntry.StatusCode] = 0
-	//	}
-	//
-	// dateCodeTotal[dbEntry.SourceId][yearBit][monthBit][dateBit][dbEntry.StatusCode]++
-	//
-	//	if _, gg := hourCodeTotal[dbEntry.SourceId][yearBit][monthBit][hourBit][dbEntry.StatusCode]; !gg {
-	//		hourCodeTotal[dbEntry.SourceId][yearBit][monthBit][hourBit][dbEntry.StatusCode] = 0
-	//	}
-	//
-	// hourCodeTotal[dbEntry.SourceId][yearBit][monthBit][hourBit][dbEntry.StatusCode]++
-	//
-	//	if _, gg := weekdayCodeTotal[dbEntry.SourceId][yearBit][monthBit][weekBit][dbEntry.StatusCode]; !gg {
-	//		weekdayCodeTotal[dbEntry.SourceId][yearBit][monthBit][weekBit][dbEntry.StatusCode] = 0
-	//	}
-	//
-	// weekdayCodeTotal[dbEntry.SourceId][yearBit][monthBit][weekBit][dbEntry.StatusCode]++
 }
 
 func SaveToDb() {
@@ -750,48 +707,6 @@ func SaveToDb() {
 						log.Fatal(err)
 					}
 				}
-				//				for d, thing := range dateCodeTotal[sourceid][yearbit][monthbit] {
-				//					for code, value := range thing {
-				//						_, err := dbOfLogs.Exec(`
-				//				INSERT INTO date_status_total
-				//				(sourceid, month, year, date, status, hits) values
-				//				(?, ?, ?, ?, ?, ?)`,
-				//							sourceid, monthbit, yearbit, d, code, value,
-				//						)
-				//						if err != nil {
-				//							fmt.Printf("Failed\n")
-				//							log.Fatal(err)
-				//						}
-				//					}
-				//				}
-				//				for d, thing := range dateCodeTotal[sourceid][yearbit][monthbit] {
-				//					for code, value := range thing {
-				//						_, err := dbOfLogs.Exec(`
-				//				INSERT INTO hour_status_total
-				//				(sourceid, month, year, hour, status, hits) values
-				//				(?, ?, ?, ?, ?, ?)`,
-				//							sourceid, monthbit, yearbit, d, code, value,
-				//						)
-				//						if err != nil {
-				//							fmt.Printf("Failed\n")
-				//							log.Fatal(err)
-				//						}
-				//					}
-				//				}
-				//				for d, thing := range dateCodeTotal[sourceid][yearbit][monthbit] {
-				//					for code, value := range thing {
-				//						_, err := dbOfLogs.Exec(`
-				//				INSERT INTO weekday_status_total
-				//				(sourceid, month, year, weekday, status, hits) values
-				//				(?, ?, ?, ?, ?, ?)`,
-				//							sourceid, monthbit, yearbit, d, code, value,
-				//						)
-				//						if err != nil {
-				//							fmt.Printf("Failed\n")
-				//							log.Fatal(err)
-				//						}
-				//					}
-				//				}
 			}
 		}
 	}
